@@ -8,9 +8,8 @@ from itertools import chain
 from logging import getLogger
 from typing import Any, Callable, List, Optional, Tuple
 
-import amp_C
+
 import torch
-from apex.multi_tensor_apply import multi_tensor_applier
 
 from .. import parallel_state, tensor_parallel
 from ..dist_checkpointing.mapping import ShardedStateDict
@@ -55,6 +54,9 @@ def _multi_tensor_copy_this_to_that(
     with bfloat16.
     """
     if overflow_buf:
+        import amp_C
+        from apex.multi_tensor_apply import multi_tensor_applier
+        
         overflow_buf.fill_(0)
         # Scaling with factor `1.0` is equivalent to copy.
         multi_tensor_applier(amp_C.multi_tensor_scale, overflow_buf, [this, that], 1.0)
