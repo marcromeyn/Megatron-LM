@@ -5,9 +5,8 @@
 import os
 from typing import List, Optional, Union
 
-import amp_C
+
 import torch
-from apex.multi_tensor_apply import multi_tensor_applier
 from torch import inf
 
 from ..tensor_parallel import param_is_not_tensor_parallel_duplicate
@@ -36,6 +35,9 @@ def get_grad_norm_fp32(
         Total norm of the parameters (viewed as a single vector).
     """
 
+    import amp_C
+    from apex.multi_tensor_apply import multi_tensor_applier
+    
     if isinstance(grads_for_norm, torch.Tensor):
         grads_for_norm = [grads_for_norm]
 
@@ -102,6 +104,9 @@ def clip_grad_by_total_norm_fp32(
         total_norm (float): total norm of the gradients.
     """
     # Grads.
+    import amp_C
+    from apex.multi_tensor_apply import multi_tensor_applier
+    
     grads = []
     for param in parameters:
         if param.grad is not None:
