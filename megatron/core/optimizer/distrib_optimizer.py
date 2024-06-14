@@ -436,6 +436,8 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
 
         super().__init__(optimizer, config, grad_scaler, init_state_fn)
 
+        from apex.optimizers import FusedAdam as Adam
+
         assert isinstance(
             optimizer, Adam
         ), "Only Adam currently supported, due to checkpointing requirements."
