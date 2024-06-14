@@ -3,8 +3,6 @@ import logging
 from typing import Callable, Dict, List, Optional
 
 import torch
-from apex.optimizers import FusedAdam as Adam
-from apex.optimizers import FusedSGD as SGD
 
 from megatron.core import mpu
 
@@ -174,6 +172,9 @@ def _get_megatron_optimizer_based_on_param_groups(
     Returns:
         Instance of MegatronOptimizer.
     """
+    from apex.optimizers import FusedAdam as Adam
+    from apex.optimizers import FusedSGD as SGD
+    
     if config.optimizer == 'adam':
         optimizer = Adam(
             param_groups,
