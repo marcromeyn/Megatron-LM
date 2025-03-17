@@ -37,6 +37,7 @@ from .strategies.base import (
     get_default_strategy,
 )
 from .utils import extract_sharded_base
+from .safe_unpickle import safe_pickle
 from .validation import (
     StrictHandling,
     determine_global_metadata,
@@ -103,57 +104,58 @@ def load(
     )
 
     checkpoint_dir = Path(checkpoint_dir)
-    common_state_dict = common_strategy.load_common(checkpoint_dir)
+    with safe_pickle():
+        common_state_dict = common_strategy.load_common(checkpoint_dir)
 
-    sharded_state_dict, nonpersistent_state_dict, sh_ten_factories = load_preprocess(
-        sharded_state_dict
-    )
-    merge(common_state_dict, nonpersistent_state_dict)
-
-    # At this point we are only dealing with ShardedBase objects
-    sharded_state_dict, _ = extract_sharded_base(sharded_state_dict)
-
-    # Validation
-    ckpt_sharded_metadata = None
-    local_metadata, global_metadata = None, None
-    strict = parse_strict_flag(strict)
-    if StrictHandling.requires_explicit_ckpt_mismatch_check(strict):
-        ckpt_sharded_metadata = load_sharded_metadata(
-            str(checkpoint_dir), sharded_strategy, common_strategy
+        sharded_state_dict, nonpersistent_state_dict, sh_ten_factories = load_preprocess(
+            sharded_state_dict
         )
-    if validate_access_integrity or StrictHandling.requires_global_app_metadata(strict):
-        local_metadata, global_metadata = determine_global_metadata(sharded_state_dict)
+        merge(common_state_dict, nonpersistent_state_dict)
 
-    sharded_state_dict, missing_keys, unexpected_keys = validate_integrity_and_strict_load(
-        sharded_state_dict,
-        strict,
-        validate_access_integrity,
-        local_metadata,
-        global_metadata,
-        ckpt_sharded_metadata,
-    )
+        # At this point we are only dealing with ShardedBase objects
+        sharded_state_dict, _ = extract_sharded_base(sharded_state_dict)
 
-    # ShardedBase loading
-    if not sharded_strategy.can_handle_sharded_objects:
-        validate_sharded_objects_handling(sharded_strategy, common_strategy)
-        sharded_objects_state_dict, sharded_state_dict = extract_matching_values(
-            sharded_state_dict, lambda v: isinstance(v, ShardedObject)
+        # Validation
+        ckpt_sharded_metadata = None
+        local_metadata, global_metadata = None, None
+        strict = parse_strict_flag(strict)
+        if StrictHandling.requires_explicit_ckpt_mismatch_check(strict):
+            ckpt_sharded_metadata = load_sharded_metadata(
+                str(checkpoint_dir), sharded_strategy, common_strategy
+            )
+        if validate_access_integrity or StrictHandling.requires_global_app_metadata(strict):
+            local_metadata, global_metadata = determine_global_metadata(sharded_state_dict)
+
+        sharded_state_dict, missing_keys, unexpected_keys = validate_integrity_and_strict_load(
+            sharded_state_dict,
+            strict,
+            validate_access_integrity,
+            local_metadata,
+            global_metadata,
+            ckpt_sharded_metadata,
         )
-        sharded_objects = common_strategy.load_sharded_objects(
-            sharded_objects_state_dict, checkpoint_dir
-        )
-        merge(common_state_dict, sharded_objects)
 
-    loaded_state_dict = sharded_strategy.load(sharded_state_dict, checkpoint_dir)
+        # ShardedBase loading
+        if not sharded_strategy.can_handle_sharded_objects:
+            validate_sharded_objects_handling(sharded_strategy, common_strategy)
+            sharded_objects_state_dict, sharded_state_dict = extract_matching_values(
+                sharded_state_dict, lambda v: isinstance(v, ShardedObject)
+            )
+            sharded_objects = common_strategy.load_sharded_objects(
+                sharded_objects_state_dict, checkpoint_dir
+            )
+            merge(common_state_dict, sharded_objects)
 
-    merge(common_state_dict, loaded_state_dict)
+        loaded_state_dict = sharded_strategy.load(sharded_state_dict, checkpoint_dir)
 
-    loaded_state_dict = apply_factory_merges(common_state_dict, sh_ten_factories)
+        merge(common_state_dict, loaded_state_dict)
 
-    if StrictHandling.requires_returning_mismatch_keys(strict):
-        return common_state_dict, missing_keys, unexpected_keys
-    else:
-        return common_state_dict
+        loaded_state_dict = apply_factory_merges(common_state_dict, sh_ten_factories)
+
+        if StrictHandling.requires_returning_mismatch_keys(strict):
+            return common_state_dict, missing_keys, unexpected_keys
+        else:
+            return common_state_dict
 
 
 def load_common_state_dict(checkpoint_dir: Path) -> StateDict:
